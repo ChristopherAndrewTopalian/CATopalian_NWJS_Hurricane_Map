@@ -12,6 +12,8 @@ We can click on any Hurricane and it will open the Google map location precisely
 
 ![screenshot_004](app/src/media/textures/screenshots/005.webp)
 
+Video: https://www.youtube.com/watch?v=GswdvQfjZX4
+
 ---
 
 REQUIREMENTS:
