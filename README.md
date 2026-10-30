@@ -1,11 +1,16 @@
 # CATopalian NWJS Hurricane Map
-A JavaScript NW.js Node.js application that 
+A JavaScript NW.js Node.js application that tracks Hurricanes worldwide!
+We can click on any Hurricane and it will open the Google map location precisely!
 
 ![screenshot_001](app/src/media/textures/screenshots/001.webp)
 
 ![screenshot_002](app/src/media/textures/screenshots/002.webp)
 
 ![screenshot_003](app/src/media/textures/screenshots/003.webp)
+
+![screenshot_004](app/src/media/textures/screenshots/004.webp)
+
+![screenshot_004](app/src/media/textures/screenshots/005.webp)
 
 ---
 
