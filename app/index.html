@@ -1,0 +1,401 @@
+<!-- Dedicated to God the Father -->
+<!-- All Rights Reserved Christopher Andrew Topalian Copyright 2000-2026 -->
+<!-- https://github.com/ChristopherTopalian -->
+<!-- https://github.com/ChristopherAndrewTopalian -->
+<!-- CATopalian_NWJS_Hurricane_Map.html -->
+
+<!DOCTYPE html>
+<html lang = "en">
+<head>
+<title> CATopalian NWJS Hurricane Map </title>
+<meta charset="UTF-8">
+<meta name='viewport' content='width=device-width, initial-scale=1.0'>
+
+<style>
+
+body
+{
+    background-color: rgb(20, 20, 25);
+    color: white;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0px;
+    padding: 0px;
+}
+
+/* INFO HEADER */
+#header_panel {
+    padding: 2px;
+    background-color: rgb(15, 15, 20);
+    text-align: center;
+}
+
+/* MAP CONTAINERS */
+#map_view {
+    width: 1000px;
+    height: 500px;
+    margin: 0px auto; /* Centers the map in the window */
+    background-color: rgb(30, 35, 45); 
+    border: 2px solid rgb(100, 100, 120);
+    overflow: hidden; /* Hides everything that zooms outside the box! */
+    cursor: grab; /* Shows the user they can drag it */
+}
+
+#map_content {
+    width: 1000px;
+    height: 450px;
+    position: relative;
+    transform-origin: 0 0; /* Forces zoom to happen from the top-left coordinate system */
+}
+
+.storm_dot {
+    background-color: rgba(0, 150, 255, 0.7);
+    border-radius: 5px;
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    cursor: pointer;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+    transform-origin: center center; 
+}
+
+.storm_dot:hover {
+    background-color: rgb(0, 255, 255);
+    border: 2px solid white;
+    transform: scale(1.5); 
+    z-index: 100;
+}
+
+/* LIST VIEW */
+#list_view {
+    position: fixed;
+    left: 0px;
+    bottom: 0px;
+    width: 1000px;
+    height: 100px; /* Fixed height guarantees the scrollbar appears */
+    margin: 1px auto;
+    background-color: rgb(25, 25, 30);
+    border: 1px solid #444;
+    overflow-y: scroll; /* Forces the vertical scrollbar */
+}
+
+.list_row {
+    font-size: 15px;
+    font-weight: bold;
+    padding: 2px;
+    border-bottom: 1px solid #444;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.list_row:hover { background-color: #333; }
+
+.storm_badge {
+    background-color: #0088ff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+</style>
+
+<script>
+
+function ge(id) { return document.getElementById(id); }
+
+function ce(tag) { return document.createElement(tag); }
+
+function ba(element) { document.body.append(element); }
+
+//----//
+
+// sound.js
+
+let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playTone(frequency, duration, waveType, volume, detune, attackTime, releaseTime, panValue)
+{
+    let oscillator = audioCtx.createOscillator();
+    // 'sine', 'square', 'sawtooth', 'triangle'
+    oscillator.type = waveType;
+    oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+    oscillator.detune.setValueAtTime(detune, audioCtx.currentTime);
+
+    let gainNode = audioCtx.createGain();
+    let pannerNode = audioCtx.createStereoPanner();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(pannerNode);
+    pannerNode.connect(audioCtx.destination);
+
+    // Convert milliseconds to seconds for the audio context
+    let durationInSeconds = duration / 1000;
+
+    // THE ENVELOPE (Attack, Sustain, Release)
+
+    // Initialize volume at 0
+    gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+
+    // Attack: Ramp up to the target volume
+    gainNode.gain.linearRampToValueAtTime(volume, audioCtx.currentTime + attackTime);
+
+    // Sustain: Hold the target volume until it is time to release
+    gainNode.gain.setValueAtTime(volume, audioCtx.currentTime + durationInSeconds - releaseTime);
+
+    // Release: Ramp the volume back down to 0
+    gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + durationInSeconds);
+
+    // Set stereo panning
+    pannerNode.pan.setValueAtTime(panValue, audioCtx.currentTime);
+
+    // Start and stop the oscillator
+    oscillator.start(audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + durationInSeconds);
+}
+
+function clickSound()
+{
+    playTone(
+        500,     // frequency
+        100,     // duration
+        'sine',  // waveType
+        0.01,    // volume
+        0,       // detune
+        0.01,      // attackTime
+        0.1,      // releaseTime
+        0.0      // panValue -0.5 is left
+    );
+}
+
+function hoverSound()
+{
+    playTone(
+        300,     // frequency
+        100,     // duration
+        'sine',  // waveType
+        0.02,    // volume
+        0,       // detune
+        0.01,      // attackTime
+        0.01,      // releaseTime
+        0.0      // panValue -0.5 is left
+    );
+}
+
+//----//
+
+function latLonToXY(lat, lon) 
+{
+    let x = (lon + 180.0) * (1000.0 / 360.0);
+    let y = (90.0 - lat) * (500.0 / 180.0);
+    return { x, y };
+}
+
+function makeInterface() 
+{
+    // Info Header
+    let header = ce('div');
+    header.id = 'header_panel';
+    
+    let countLbl = ce('div');
+    countLbl.id = 'count_lbl';
+    countLbl.textContent = 'Scanning oceans...';
+    countLbl.style.fontWeight = 'bold';
+    countLbl.style.color = '#0088ff';
+    countLbl.style.margin = '0px';
+    header.append(countLbl);
+    ba(header);
+
+    // The Map View (The "Window" we look through)
+    let mapView = ce('div');
+    mapView.id = 'map_view';
+    ba(mapView);
+
+    // The Map Content (The actual image and dots that will move and scale)
+    let mapContent = ce('div');
+    mapContent.id = 'map_content';
+    mapView.append(mapContent);
+
+    let mapBg = ce('img');
+    mapBg.src = 'src/media/textures/maps/Earthmap1000x500.jpg';
+    mapBg.style.position = 'absolute';
+    mapBg.style.width = '1000px';
+    mapBg.style.height = '500px';
+    mapBg.style.pointerEvents = 'none'; // Prevents dragging the image by accident
+    mapContent.append(mapBg);
+
+    // The Scrollable List
+    let listView = ce('div');
+    listView.id = 'list_view';
+    ba(listView);
+
+    // Activate the Zoom and Pan Logic
+    setupZoomPan(mapView, mapContent);
+
+    // Fetch the Data
+    loadHurricanes();
+}
+
+async function loadHurricanes() 
+{
+    let url = "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventlist=TC";
+    
+    try 
+    {
+        let response = await fetch(url);
+        let data = await response.json();
+        let features = data.features || [];
+
+        ge('count_lbl').textContent = features.length === 0 ? "No active storms globally." : `Active Storms: ${features.length}`;
+
+        let mapContent = ge('map_content');
+        let listView = ge('list_view');
+
+        features.forEach(function(storm) 
+        {
+            let props = storm.properties;
+            let coords = storm.geometry.coordinates;
+            
+            let name = props.name || 'Unnamed Storm';
+            let alert_level = props.alertlevel || 'TC';
+            
+            let lon = coords[0];
+            let lat = coords[1];
+            let { x, y } = latLonToXY(lat, lon);
+
+            // Add dot to mapContent (so it zooms with the map)
+            let dot = ce('div');
+            dot.className = 'storm_dot';
+            dot.title = name + "\nAlert Level: " + alert_level;
+            dot.style.left = Math.floor(x) - 6 + 'px';
+            dot.style.top = Math.floor(y) - 6 + 'px';
+            
+            let mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+            dot.addEventListener('mouseover', function()
+            {
+                hoverSound();
+            });
+
+            dot.onclick = function()
+            {
+                clickSound();
+                nw.Shell.openExternal(mapsUrl);
+            };
+            
+            mapContent.append(dot);
+
+            // Add row to list view
+            let row = ce('div');
+            row.className = 'list_row';
+            row.onclick = function()
+            {
+                clickSound();
+                nw.Shell.openExternal(mapsUrl);
+            };
+
+            let badge = ce('span');
+            badge.className = 'storm_badge';
+            badge.textContent = "STORM";
+            row.append(badge);
+
+            let info = ce('span');
+            info.textContent = name;
+            info.style.fontSize = '14px';
+            row.append(info);
+
+            listView.append(row);
+
+            // Hover sync
+            row.addEventListener('mouseenter', function()
+            {
+                hoverSound();
+                dot.style.backgroundColor = 'rgb(0, 255, 255)';
+                dot.style.border = '2px solid white';
+                dot.style.transform = 'scale(1.5)';
+                dot.style.zIndex = '100';
+            });
+            
+            row.addEventListener('mouseleave', function()
+            {
+                dot.style.backgroundColor = '';
+                dot.style.border = '';
+                dot.style.transform = '';
+                dot.style.zIndex = '';
+            });
+        });
+    } 
+    catch (err) 
+    {
+        ge('count_lbl').textContent = "Failed to load storm data.";
+    }
+}
+
+// ZOOM & PAN LOGIC
+function setupZoomPan(view, content) 
+{
+    let scale = 1;
+    let panX = 0;
+    let panY = 0;
+    let isDragging = false;
+    let startX, startY;
+
+    // Mouse Wheel Zooming
+    view.addEventListener('wheel', function(e)
+    {
+        e.preventDefault(); // Stops the whole window from scrolling
+        
+        // Adjust zoom speed multiplier (0.001)
+        let zoomAmount = e.deltaY * -0.001; 
+        scale += zoomAmount;
+        
+        // Restrict zoom between 1x (normal) and 5x (close up)
+        scale = Math.min(Math.max(1, scale), 5); 
+        
+        updateTransform();
+    });
+
+    // Mouse Drag Panning
+    view.addEventListener('mousedown', function(e)
+    {
+        isDragging = true;
+        startX = e.clientX - panX;
+        startY = e.clientY - panY;
+        view.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mousemove', function(e)
+    {
+        if (!isDragging) return;
+        panX = e.clientX - startX;
+        panY = e.clientY - startY;
+        updateTransform();
+    });
+
+    window.addEventListener('mouseup', function() {
+        isDragging = false;
+        view.style.cursor = 'grab';
+    });
+
+    function updateTransform()
+    {
+        // Apply the math directly to the CSS engine
+        content.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+    }
+}
+
+function whenLoaded()
+{
+    makeInterface();
+}
+
+</script>
+
+</head>
+
+<body onload = "whenLoaded()">
+
+</body>
+
+</html>
+

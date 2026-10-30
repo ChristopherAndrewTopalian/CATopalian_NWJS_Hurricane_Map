@@ -1,0 +1,12 @@
+{
+  "name": "catopalian-nwjs-hurricane-map",
+  "version": "1.0.0",
+  "main": "index.html",
+  "window": {
+    "title": "CATopalian NWJS Hurricane Map",
+    "width": 1020,
+    "height": 850,
+    "icon": "src/media/textures/icons/001.png",
+    "position": "center"
+  }
+}
