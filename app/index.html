@@ -93,7 +93,7 @@ body
 
 .storm_badge {
     background-color: #0088ff;
-    padding: 4px 8px;
+    padding: 0px 5px;
     border-radius: 4px;
     font-weight: bold;
     margin-right: 10px;
@@ -264,7 +264,7 @@ async function loadHurricanes()
             let lat = coords[1];
             let { x, y } = latLonToXY(lat, lon);
 
-            // Add dot to mapContent (so it zooms with the map)
+            // 1. Create Dot
             let dot = ce('div');
             dot.className = 'storm_dot';
             dot.title = name + "\nAlert Level: " + alert_level;
@@ -272,20 +272,8 @@ async function loadHurricanes()
             dot.style.top = Math.floor(y) - 6 + 'px';
             
             let mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
-            dot.addEventListener('mouseover', function()
-            {
-                hoverSound();
-            });
-
-            dot.onclick = function()
-            {
-                clickSound();
-                nw.Shell.openExternal(mapsUrl);
-            };
             
-            mapContent.append(dot);
-
-            // Add row to list view
+            // 2. Create Row
             let row = ce('div');
             row.className = 'list_row';
             row.onclick = function()
@@ -304,9 +292,32 @@ async function loadHurricanes()
             info.style.fontSize = '14px';
             row.append(info);
 
+            // === THE BI-DIRECTIONAL SYNC ===
+
+            // A. Hover the DOT -> Highlight the ROW
+            dot.addEventListener('mouseenter', function()
+            {
+                hoverSound();
+                row.style.backgroundColor = '#333'; // Highlight the row
+                // Magic touch: smoothly scrolls the list so the row is visible!
+                row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+
+            dot.addEventListener('mouseleave', function()
+            {
+                row.style.backgroundColor = ''; // Remove row highlight
+            });
+
+            dot.onclick = function()
+            {
+                clickSound();
+                nw.Shell.openExternal(mapsUrl);
+            };
+            
+            mapContent.append(dot);
             listView.append(row);
 
-            // Hover sync
+            // B. Hover the ROW -> Highlight the DOT
             row.addEventListener('mouseenter', function()
             {
                 hoverSound();
@@ -343,13 +354,11 @@ function setupZoomPan(view, content)
     // Mouse Wheel Zooming
     view.addEventListener('wheel', function(e)
     {
-        e.preventDefault(); // Stops the whole window from scrolling
+        e.preventDefault(); 
         
-        // Adjust zoom speed multiplier (0.001)
-        let zoomAmount = e.deltaY * -0.001; 
+        let zoomAmount = e.deltaY * -0.001;
         scale += zoomAmount;
         
-        // Restrict zoom between 1x (normal) and 5x (close up)
         scale = Math.min(Math.max(1, scale), 5); 
         
         updateTransform();
@@ -379,7 +388,6 @@ function setupZoomPan(view, content)
 
     function updateTransform()
     {
-        // Apply the math directly to the CSS engine
         content.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
     }
 }
